@@ -59,12 +59,12 @@ export class Renderer {
         this._setCanvasResolution();
     }
 
-    setVertShader(source) {
+    setVertShader(source = DEFAULT_VERT_SRC) {
         this._setShader(this._gl.VERTEX_SHADER, source);
         this._linkProgram();
     }
 
-    setFragShader(source) {
+    setFragShader(source = DEFAULT_FRAG_SRC) {
         this._setShader(this._gl.FRAGMENT_SHADER, source);
         this._linkProgram();
     }

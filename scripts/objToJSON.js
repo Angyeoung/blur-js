@@ -1,4 +1,4 @@
-import { Vector3 } from '../math.js';
+import { Vector3 } from '../src/math.js';
 /**
  * Cool script to convert .obj files to .json files
  * Using JSON.parse() will result in:
@@ -16,11 +16,11 @@ import { Vector3 } from '../math.js';
 
 import { readFileSync, writeFileSync } from 'fs';
 
-const INFILE  = "models/maxwell.obj"
-    , OUTFILE = "models/maxwell.json";
+const INFILE  = "models/sponza.obj"
+    , OUTFILE = "models/sponza.json";
 
 /** @type {string[]} */
-const arr = readFileSync(INFILE, "utf-8").split("\n");
+const lines = readFileSync(INFILE, "utf-8").split("\n");
 
 // v = vertex, vn = vert normal, vt = vert texture, f = face (tris)
 // f v1/vt1/vn1 v2/vt2/vn1 v3/vt3/vn1 ...
@@ -35,7 +35,7 @@ let mesh = {
     tris: [], 
     norms: [] 
 };
-for (let line of arr) {
+for (let line of lines) {
     const type = (line[0] + line[1]);
     if (type == 'v ') {
         // line = 'v 0.477241 0.205729 0.676920'
@@ -58,8 +58,8 @@ for (let line of arr) {
             z = split[3].split('/');
         
         mesh.tris.push(
-            parseInt(y[0]) - 1, // should be removed for 0-indexed files
             parseInt(x[0]) - 1, // The file I have is 1-indexed. These 1's
+            parseInt(y[0]) - 1, // should be removed for 0-indexed files
             parseInt(z[0]) - 1, // <--
         );
     }
@@ -74,15 +74,15 @@ for (let i = 0; i < mesh.tris.length; i += 3) {
     let a = new Vector3(mesh.verts[aIdx * 3], mesh.verts[aIdx * 3 + 1], mesh.verts[aIdx * 3 + 2]);
     let b = new Vector3(mesh.verts[bIdx * 3], mesh.verts[bIdx * 3 + 1], mesh.verts[bIdx * 3 + 2]);
     let c = new Vector3(mesh.verts[cIdx * 3], mesh.verts[cIdx * 3 + 1], mesh.verts[cIdx * 3 + 2]);
-    let p = Vector3.cross(b.minus(a), c.minus(a));
+    let p = Vector3.cross(b.sub(a), c.sub(a));
     norms[aIdx] = norms[aIdx].add(p);
     norms[bIdx] = norms[bIdx].add(p);
     norms[cIdx] = norms[cIdx].add(p);
 }
 // console.log(norms);
 for (let i = 0; i < norms.length; i++) {
-    norms[i].Normalize();
-    norms[i] = norms[i].scale(-1);
+    norms[i].normalize();
+    norms[i].scale(-1);
     mesh.norms.push(norms[i].x, norms[i].y, norms[i].z);
 }
 

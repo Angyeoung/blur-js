@@ -185,6 +185,7 @@ export class Vector3 {
         this.x += vector.x;
         this.y += vector.y;
         this.z += vector.z;
+        return this;
     }
 
 
@@ -198,6 +199,7 @@ export class Vector3 {
         this.x -= vector.x;
         this.y -= vector.y;
         this.z -= vector.z;
+        return this;
     }
 
     /**

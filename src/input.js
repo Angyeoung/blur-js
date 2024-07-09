@@ -1,5 +1,5 @@
 import { Vector3 } from "./math.js";
-
+import { Transform } from "./gameObject.js";
 
 export class Input {
     movement = Vector3.zero;
@@ -37,4 +37,20 @@ export class Input {
         document.addEventListener('keydown', handleInput);
         document.addEventListener('keyup',   handleInput);
     }
+}
+
+// TODO: Find a way to make something like this work
+export class Controller {
+
+    /**
+     * @param {Transform} transform 
+     * @param {Input} input 
+     */
+    constructor(transform, input) {
+        this.transform = transform;
+        this.input = input;
+    }
+
+
+
 }
