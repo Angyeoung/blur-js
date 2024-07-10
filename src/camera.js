@@ -12,6 +12,7 @@ export class Camera extends GameObject {
         this.fov = 0.90;
         this.near = 0.1;
         this.far = 20000;
+        window.addEventListener('resize', () => this._projectionUpdated = true);
     }
     /* ========================================================== */
 

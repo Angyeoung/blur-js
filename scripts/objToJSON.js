@@ -1,90 +1,84 @@
 import { Vector3 } from '../src/math.js';
-/**
- * Cool script to convert .obj files to .json files
- * Using JSON.parse() will result in:
- * 
- * const result = {
- *     verts: [
- *         x1, y1, z1,
- *         x2, y2, z2,
- *         ...
- *     ],
- *     norms: (same as verts but for norms)
- *     tris:  [ vertsIndex1, vertsIndex2, vertsIndex3, normsIndex1, normsIndex2, normsIndex3 ]
- * }
- */
-
 import { readFileSync, writeFileSync } from 'fs';
 
-const INFILE  = "models/sponza.obj"
-    , OUTFILE = "models/sponza.json";
+const NAME = 'monkey';
+const INFILE = 'models/' + NAME + '.obj';
+const OUTFILE = 'models/' + NAME + '.json';
 
 /** @type {string[]} */
 const lines = readFileSync(INFILE, "utf-8").split("\n");
 
-// v = vertex, vn = vert normal, vt = vert texture, f = face (tris)
-// f v1/vt1/vn1 v2/vt2/vn1 v3/vt3/vn1 ...
+const verts = [];
+const tris = [];
+const norms = [];
 
-// v   x1  y1  z1 ... (position)
-// vn xn1 yn1 zn1 ... (normal)
-// f v1//vn1 v2//vn2 v3//vn3 ... (indices of position, normal, texture)
-
-// Gonna skip textures for now and just load verts and tris and norms
-let mesh = { 
-    verts:[], 
-    tris: [], 
-    norms: [] 
-};
-for (let line of lines) {
+for (let line of lines.slice(0, 20)) {
     const type = (line[0] + line[1]);
-    if (type == 'v ') {
-        // line = 'v 0.477241 0.205729 0.676920'
-        const split = line.split(" ");
-        mesh.verts.push(
-            parseFloat(split[1]),
-            parseFloat(split[2]), 
-            parseFloat(split[3])
-        );
-    } 
-    else if (type == 'f ') {
-        // line = 'f 1//1 504//2 1552//3'
-        // split = ['f', '1//1', '504//2', '1552//3']
-        const split = line.split(" ");
-        // x = [   '1', '', '1']
-        // y = [ '504', '', '2']
-        // z = ['1552', '', '3']
-        let x = split[1].split('/'),
-            y = split[2].split('/'),
-            z = split[3].split('/');
-        
-        mesh.tris.push(
-            parseInt(x[0]) - 1, // The file I have is 1-indexed. These 1's
-            parseInt(y[0]) - 1, // should be removed for 0-indexed files
-            parseInt(z[0]) - 1, // <--
-        );
+    if (type == 'v ')
+        handleVertexLine(line);
+    else if (type == 'f ')
+        handleFaceLine(line);
+}
+
+calculateNormals();
+console.log("Done!");
+writeFileSync(OUTFILE, JSON.stringify({verts, tris, norms}), { encoding: "utf8" });
+
+
+
+/** @param {string} line */
+function handleVertexLine(line) {
+    let arr = line.slice(2).trim().split(/\s+/);
+    let x = parseFloat(arr[0]);
+    let y = parseFloat(arr[1]);
+    let z = parseFloat(arr[2]);
+    console.log(x, y, z);
+    verts.push(x, y, z);
+}
+
+/** @param {string} line */
+function handleFaceLine(line) {
+    let arr = line.slice(2).trim().split(/\s+/);
+    if (arr.length > 4 || arr.length < 3)
+        return console.log('Error@HandleFaceLine: Invalid count\n', line, arr);
+
+    let p1info = arr[0].split('/');
+    let p2info = arr[1].split('/');
+    let p3info = arr[2].split('/');
+    let p1vert = parseInt(p1info[0]) - 1;
+    let p2vert = parseInt(p2info[0]) - 1;
+    let p3vert = parseInt(p3info[0]) - 1;
+    tris.push(p1vert, p3vert, p2vert);
+
+    if (arr.length > 3) {
+        let p4info = arr[3].split('/');
+        let p4vert = parseInt(p4info[0]) - 1;
+        tris.push(p1vert, p4vert, p3vert);
     }
 }
 
-/** @type {Vector3[]} */
-let norms = new Array(mesh.verts.length / 3).fill(Vector3.zero);
-for (let i = 0; i < mesh.tris.length; i += 3) {
-    let aIdx = mesh.tris[i];
-    let bIdx = mesh.tris[i + 1];
-    let cIdx = mesh.tris[i + 2];
-    let a = new Vector3(mesh.verts[aIdx * 3], mesh.verts[aIdx * 3 + 1], mesh.verts[aIdx * 3 + 2]);
-    let b = new Vector3(mesh.verts[bIdx * 3], mesh.verts[bIdx * 3 + 1], mesh.verts[bIdx * 3 + 2]);
-    let c = new Vector3(mesh.verts[cIdx * 3], mesh.verts[cIdx * 3 + 1], mesh.verts[cIdx * 3 + 2]);
-    let p = Vector3.cross(b.sub(a), c.sub(a));
-    norms[aIdx] = norms[aIdx].add(p);
-    norms[bIdx] = norms[bIdx].add(p);
-    norms[cIdx] = norms[cIdx].add(p);
-}
-// console.log(norms);
-for (let i = 0; i < norms.length; i++) {
-    norms[i].normalize();
-    norms[i].scale(-1);
-    mesh.norms.push(norms[i].x, norms[i].y, norms[i].z);
-}
+function calculateNormals() {
+    /** @type {Vector3[]} */
+    const normals = new Array(verts.length / 3).fill(Vector3.zero);
+    for (let i = 0; i < tris.length; i += 3) {
+    // for (let i = 0; i < 20; i += 3) {
+        let p1Idx = tris[i];
+        let p2Idx = tris[i + 1];
+        let p3Idx = tris[i + 2];
+        let a = new Vector3(verts[p1Idx * 3], verts[p1Idx * 3 + 1], verts[p1Idx * 3 + 2]);
+        let b = new Vector3(verts[p2Idx * 3], verts[p2Idx * 3 + 1], verts[p2Idx * 3 + 2]);
+        let c = new Vector3(verts[p3Idx * 3], verts[p3Idx * 3 + 1], verts[p3Idx * 3 + 2]);
+        let p = Vector3.cross(b.diff(a), c.diff(a));
 
-console.log("Done!");
-writeFileSync(OUTFILE, JSON.stringify(mesh), { encoding: "utf8" });
+        normals[p1Idx].add(p);
+        normals[p2Idx].add(p);
+        normals[p3Idx].add(p);
+    }
+
+    for (let i = 0; i < normals.length; i++) {
+        if (!normals[i]) console.log("error")
+        normals[i].normalize();
+        normals[i].scale(-1);
+        norms.push(normals[i].x, normals[i].y, normals[i].z);
+    }
+}

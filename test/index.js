@@ -18,11 +18,13 @@ const input = new Input();
 const clock = new Clock();
 
 const monkey = new GameObject("Monkey").setMesh(await Mesh.fromFile('monkey'));
-const sponza = new GameObject("Sponza").setMesh(await Mesh.fromFile('sponza'));
-scene.add(monkey, sponza);
+const maxwell = new GameObject("maxwell").setMesh(await Mesh.fromFile('maxwell'));
+scene.add(monkey, maxwell);
 camera.transform.setPosition(new Vector3(0, 0, -5));
 monkey.transform.rotate(new Vector3(0, 180, 0));
-sponza.transform.setScale(new Vector3(0.01, 0.01, 0.01));
+monkey.transform.setPosition(new Vector3(-5, 0, 0));
+maxwell.transform.setScale(new Vector3(0.05, 0.05, 0.05));
+console.log(maxwell.mesh)
 
 let deltaTime = 0;
 function update() {

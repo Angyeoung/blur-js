@@ -1,5 +1,8 @@
 export class Clock {
 
+    #delta = 0;
+    #newTime = 0;
+
 	constructor(autoStart = true) {
 		this.autoStart = autoStart;
 		this.startTime = 0;
@@ -34,13 +37,13 @@ export class Clock {
 			return 0;
 		}
 
-        let delta = 0
+        this.#delta = 0
 		if (this.running) {
-            let newTime = performance.now();
-			delta = (newTime - this.lastTime) / 1000;
-            this.lastTime = newTime;
+            this.#newTime = performance.now();
+			this.#delta = (this.#newTime - this.lastTime) / 1000;
+            this.lastTime = this.#newTime;
 		}
-		return delta;
+		return this.#delta;
 	}
 
 }

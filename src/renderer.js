@@ -57,6 +57,7 @@ export class Renderer {
             mProj: this._gl.getUniformLocation(this._program, 'mProj')
         }
         this._setCanvasResolution();
+        window.addEventListener('resize', () => this._setCanvasResolution());
     }
 
     setVertShader(source = DEFAULT_VERT_SRC) {

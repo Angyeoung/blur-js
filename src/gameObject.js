@@ -179,9 +179,9 @@ export class Mesh {
     /* ========================================================== */
 
     static async fromFile(name) {
-        const { verts, tris, norms } = await (await fetch('../models/' + name + '.json')).json();
+        const mesh = await fetch('../models/' + name + '.json').then(r => r.json());
         console.log(`Mesh '${name}' Loaded!\n\n`);
-        return new Mesh(verts, tris, norms);
+        return new Mesh(mesh.verts, mesh.tris, mesh.norms);
     }
 
     static createSharedMesh(meshes) {
