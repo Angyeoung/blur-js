@@ -134,7 +134,7 @@ export class Renderer {
             console.error('Program validation failed:\n\n', this._gl.getProgramInfoLog(this._program));
     }
 
-    _setCanvasResolution(mult = 1) {
+    _setCanvasResolution(mult = 0.5) {
         this.canvas.width = window.innerWidth * mult;
         this.canvas.height = window.innerHeight * mult;
         this._gl.viewport(0, 0, window.innerWidth * mult, window.innerHeight * mult);  

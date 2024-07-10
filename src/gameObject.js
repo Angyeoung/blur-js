@@ -178,10 +178,13 @@ export class Mesh {
     }
     /* ========================================================== */
 
-    static async fromFile(name) {
-        const mesh = await fetch('../models/' + name + '.json').then(r => r.json());
-        console.log(`Mesh '${name}' Loaded!\n\n`);
-        return new Mesh(mesh.verts, mesh.tris, mesh.norms);
+    /** @param {string} path */
+    static async fromFile(path) {
+        const text = await fetch(path).then(r => r.text());
+        console.log(`Mesh from '${path}' Loaded!\n\n`);
+        if (path.endsWith('.obj'))
+            return MeshLoader.obj(text);
+        return console.error("Error @ Mesh.fromFile(): Unsupported file type");
     }
 
     static createSharedMesh(meshes) {
@@ -226,4 +229,66 @@ export class Mesh {
         return sharedMesh;
     
     }
+}
+
+class MeshLoader {
+
+    /** @param {string} text */
+    static obj(text) {
+        const tris = [], verts = [];
+        const lines = text.split('\n');
+
+        // Format and push tris and verts
+        for (let line of lines) {
+            if (line.length < 2) continue;
+            const type = line[0] + line[1];
+            
+            if (type === 'v ') {
+                const xyz = line.slice(2).trim().split(/\s+/).map(parseFloat);
+                verts.push(...xyz);
+            }
+            else if (type === 'f ') {
+                // todo: the parseInt here currently gets rid of texcoords/normals
+                const indices = line.slice(2).trim().split(/\s+/).map(n => parseInt(n) - 1);
+                tris.push(indices[0], indices[2], indices[1]);
+            }
+        }
+
+        // Add normals of adjacent faces to all verts
+        const norms = Array(verts.length).fill(0);
+        let p1Idx, p2Idx, p3Idx, 
+            p1x, p1y, p1z,
+            p2x, p2y, p2z,
+            p3x, p3y, p3z,
+            nx, ny, nz;
+        for (let t = 0; t < tris.length; t += 3) {
+            p1Idx = tris[t] * 3; p2Idx = tris[t + 1] * 3; p3Idx = tris[t + 2] * 3;
+            p1x = verts[p1Idx]; p1y = verts[p1Idx + 1]; p1z = verts[p1Idx + 2];
+            p2x = verts[p2Idx]; p2y = verts[p2Idx + 1]; p2z = verts[p2Idx + 2];
+            p3x = verts[p3Idx]; p3y = verts[p3Idx + 1]; p3z = verts[p3Idx + 2];
+
+            // calculate the normal of this triangle
+            // add the normal to all
+            nx = (p2y - p1y) * (p3z - p1z) - (p2z - p1z) * (p3y - p1y);
+            ny = (p2z - p1z) * (p3x - p1x) - (p2x - p1x) * (p3z - p1z);
+            nz = (p2x - p1x) * (p3y - p1y) - (p2y - p1y) * (p3x - p1x);
+            
+            norms[p1Idx] += nx; norms[p1Idx + 1] += ny; norms[p1Idx + 2] += nz;
+            norms[p2Idx] += nx; norms[p2Idx + 1] += ny; norms[p2Idx + 2] += nz;
+            norms[p3Idx] += nx; norms[p3Idx + 1] += ny; norms[p3Idx + 2] += nz;
+        }
+        // Normalize normals
+        let num, len;
+        for (let i = 0; i < norms.length; i += 3) {
+            len = Math.sqrt(norms[i] * norms[i] + norms[i + 1] * norms[i + 1] + norms[i + 2] * norms[i + 2]);
+            if (len === 0) continue;
+            num = -1.0 / len;
+            norms[i] *= num;
+            norms[i + 1] *= num;
+            norms[i + 2] *= num;
+        }
+
+        return new Mesh(verts, tris, norms);
+    }
+
 }
