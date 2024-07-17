@@ -5,9 +5,12 @@ export class Input {
     movement = Vector3.zero;
     rotation = Vector3.zero;
 
-    constructor() {
+    constructor(initialSpeed, step) {
+        this.speed = initialSpeed;
+        this.step = step;
+
         /** @param {KeyboardEvent} e */
-        let handleInput = (e) => {
+        let handleKeyboardInput = (e) => {
             // e.preventDefault();
             if (e.repeat) return;
             const isDown = e.type === 'keydown';
@@ -34,8 +37,15 @@ export class Input {
                     this.rotation.y = isDown ? -1 : 0; break;
             }
         }
-        document.addEventListener('keydown', handleInput);
-        document.addEventListener('keyup',   handleInput);
+
+        /** @param {WheelEvent} e */
+        let handleWheelInput = (e) => {
+            this.speed += -Math.sign(e.deltaY) * this.step;
+            this.speed = Math.max(0, this.speed);
+        }
+        document.addEventListener('keydown', handleKeyboardInput);
+        document.addEventListener('keyup',   handleKeyboardInput);
+        document.addEventListener('wheel', handleWheelInput);
     }
 }
 

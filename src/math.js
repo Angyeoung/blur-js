@@ -202,6 +202,8 @@ export class Vector3 {
         return this;
     }
 
+
+    
     /**
      * Scales this vector by `n`
      * @param {number} n 

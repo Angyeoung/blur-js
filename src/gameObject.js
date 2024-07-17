@@ -99,6 +99,7 @@ export class Transform {
         this.position.z += vector.z;
         this.#worldNeedsUpdate = true;
         this.#viewNeedsUpdate = true;
+        return this;
     }
 
 
@@ -110,6 +111,7 @@ export class Transform {
         this.translate(local);
         this.#worldNeedsUpdate = true;
         this.#viewNeedsUpdate = true;
+        return this;
     }
 
 
@@ -122,6 +124,7 @@ export class Transform {
         this.rotation.z = (this.rotation.z + vector.z) % 360;
         this.#worldNeedsUpdate = true;
         this.#viewNeedsUpdate = true;
+        return this;
     }
 
 
@@ -134,6 +137,7 @@ export class Transform {
         this.position.z = vector.z;
         this.#worldNeedsUpdate = true;
         this.#viewNeedsUpdate = true;
+        return this;
     }
 
 
@@ -146,6 +150,7 @@ export class Transform {
         this.rotation.z = vector.z % 360;
         this.#worldNeedsUpdate = true;
         this.#viewNeedsUpdate = true;
+        return this;
     }
 
 
@@ -158,6 +163,7 @@ export class Transform {
         this.scale.z = vector.z;
         this.#worldNeedsUpdate = true;
         this.#viewNeedsUpdate = true;
+        return this;
     }
 
 }
@@ -169,12 +175,11 @@ export class Mesh {
     vao = null;
 
     /* ========================================================== */
-    constructor(vertices, triangles, normals = undefined) {
+    constructor(vertices, triangles, normals = undefined, uvs = undefined) {
         this.vertices = new Float32Array(vertices);
         this.triangles = new Uint16Array(triangles);
         this.normals = new Float32Array(normals);
-        // todo textures
-        // todo materials
+        this.uvs = new Float32Array(uvs);
     }
     /* ========================================================== */
 
@@ -235,8 +240,8 @@ class MeshLoader {
 
     /** @param {string} text */
     static obj(text) {
-        const tris = [], verts = [];
         const lines = text.split('\n');
+        const tris = [], verts = [], uvs = [], uvCoords = [];
 
         // Format and push tris and verts
         for (let line of lines) {
@@ -247,10 +252,25 @@ class MeshLoader {
                 const xyz = line.slice(2).trim().split(/\s+/).map(parseFloat);
                 verts.push(...xyz);
             }
+            else if (type === 'vt') {
+                const xy = line.slice(2).trim().split(/\s+/).map(parseFloat);
+                if (xy.length > 2) console.error("Mesh has uvs with >2 components.");
+                uvCoords.push(...xy);
+            }
             else if (type === 'f ') {
-                // todo: the parseInt here currently gets rid of texcoords/normals
-                const indices = line.slice(2).trim().split(/\s+/).map(n => parseInt(n) - 1);
-                tris.push(indices[0], indices[2], indices[1]);
+                const split = line.slice(2).trim().split(/\s+/).map(arr => arr.split('/'));
+                const vert = split.map(i => parseInt(i[0]) - 1);
+                // const norm = split.map(i => parseInt(i[1]) - 1);
+                const text = split.map(i => parseInt(i[2]) - 1);
+                if (split.length === 3) {
+                    tris.push(vert[0], vert[1], vert[2]);
+                    uvs.push(uvCoords[text[0]], uvCoords[text[1]], uvCoords[text[2]]);
+                } else {
+                    for (let i = 0; i < split.length - 2; i++) {
+                        tris.push(vert[0], vert[i+1], vert[i+2]);
+                        uvs.push(uvCoords[text[0]], uvCoords[text[i+1]], uvCoords[text[i+2]]);
+                    }
+                }
             }
         }
 
@@ -282,13 +302,13 @@ class MeshLoader {
         for (let i = 0; i < norms.length; i += 3) {
             len = Math.sqrt(norms[i] * norms[i] + norms[i + 1] * norms[i + 1] + norms[i + 2] * norms[i + 2]);
             if (len === 0) continue;
-            num = -1.0 / len;
+            num = 1.0 / len;
             norms[i] *= num;
             norms[i + 1] *= num;
             norms[i + 2] *= num;
         }
 
-        return new Mesh(verts, tris, norms);
+        return new Mesh(verts, tris, norms, uvs);
     }
 
 }
