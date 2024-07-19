@@ -45,7 +45,7 @@ function update() {
 
     camera.transform.translateLocal(input.movement.scaled(deltaTime * input.speed));
     camera.transform.rotate(input.rotation.scaled(deltaTime * 120));
-    monkey.transform.rotate(new Vector3(0, 180 * deltaTime, 0));
+    monkey.transform.rotate(new Vector3(0, 10 * deltaTime, 0));
 
     renderer.render(scene, camera);
 }

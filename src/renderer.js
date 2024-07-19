@@ -2,7 +2,9 @@ import { Mesh } from "./gameObject.js";
 import { Camera } from "./camera.js";
 import { Scene } from "./scene.js";
 
-
+const uTypes = {
+    mat4: 35676,
+}
 
 /**
  * This class is meant to be a wrapper around webgl,
@@ -10,22 +12,17 @@ import { Scene } from "./scene.js";
  */
 export class Renderer {
 
+    a = 2;
+
     /** @param {HTMLCanvasElement} canvas */
     constructor(canvas) {
         this.canvas = canvas;
         this._gl = canvas.getContext('webgl2');
         this._program = this._createProgram(Shader.defaultVert, Shader.defaultFrag);
+        this._settings();
+        this._setUniformInfo();
         this._setCanvasResolution();
         window.addEventListener('resize', () => this._setCanvasResolution());
-
-        // settings
-        this._gl.enable(this._gl.DEPTH_TEST);
-        this._gl.enable(this._gl.CULL_FACE);
-        this._gl.frontFace(this._gl.CW);
-        this._gl.cullFace(this._gl.BACK);
-        this.setClearColor(0.75, 0.85, 0.8, 1);
-
-        this._uniformLocations = this._getUniformLocations();
     }
 
     setClearColor(r, g, b, a) {
@@ -41,14 +38,16 @@ export class Renderer {
         this._gl.clear(this._gl.COLOR_BUFFER_BIT | this._gl.DEPTH_BUFFER_BIT);
         
         // Set uniforms for view and projection
-        this._gl.uniformMatrix4fv(this._uniformLocations.uView, false, camera.transform.getViewMatrix());
-        this._gl.uniformMatrix4fv(this._uniformLocations.uProj, false, camera.getProjectionMatrix());
+        this._setUniforms({
+            uView: camera.transform.getViewMatrix(),
+            uProj: camera.getProjectionMatrix()
+        });
 
         for (let gameObject of scene.children) {
             if (!gameObject.mesh) continue;
             if (!gameObject.mesh.isBound) this._setupVAO(gameObject.mesh);
-
-            this._gl.uniformMatrix4fv(this._uniformLocations.uWorld, false, gameObject.transform.getWorldMatrix());
+            
+            this._setUniforms({ uWorld: gameObject.transform.getWorldMatrix() });
             
             this._gl.bindVertexArray(gameObject.mesh.vao);
             this._gl.drawElements(this._gl.TRIANGLES, gameObject.mesh.triangles.length, this._gl.UNSIGNED_SHORT, 0);
@@ -90,6 +89,14 @@ export class Renderer {
         this._gl.viewport(0, 0, window.innerWidth * mult, window.innerHeight * mult);  
     }
     
+    _settings() {
+        this._gl.enable(this._gl.DEPTH_TEST);
+        this._gl.enable(this._gl.CULL_FACE);
+        this._gl.frontFace(this._gl.CW);
+        this._gl.cullFace(this._gl.BACK);
+        this.setClearColor(0.75, 0.85, 0.8, 1);
+    }
+
     /**
      * @param {Mesh} mesh 
      */
@@ -135,17 +142,26 @@ export class Renderer {
         this._gl.enableVertexAttribArray(loc);
     }
 
-    _getUniformLocations() {
-        const uniformLocations = {};
-
+    _setUniformInfo() {
+        /** @type {{string: {location: number, size: number, type: number}}} */
+        const uniforms = {};
         const numUniforms = this._gl.getProgramParameter(this._program, this._gl.ACTIVE_UNIFORMS);
         for (let i = 0; i < numUniforms; i++) {
-            const uniformInfo = this._gl.getActiveUniform(this._program, i);
-            const uniformLocation = this._gl.getUniformLocation(this._program, uniformInfo.name);
-            uniformLocations[uniformInfo.name] = uniformLocation;
+            const info = this._gl.getActiveUniform(this._program, i);
+            if (!info) continue;
+            const location = this._gl.getUniformLocation(this._program, info.name);
+            uniforms[info.name] = { location, size: info.size, type: info.type };
         }
+        this._uniforms = uniforms;
+    }
 
-        return uniformLocations;
+    _setUniforms(obj) {
+        for (let name in obj) {
+            const info = this._uniforms[name];
+            if (info.type === uTypes.mat4) {
+                this._gl.uniformMatrix4fv(info.location, false, obj[name]);
+            }
+        }
     }
 }
 
@@ -174,68 +190,6 @@ export class Shader {
 
         void main() {
             fragColor = vFragColor;
-        }
-    `;
-    
-    static textureVert = `#version 300 es
-        in vec3 aPosition;
-        in vec3 aNormal;
-        in vec2 aTexCoord;
-        
-        uniform mat4 uProj;
-        uniform mat4 uView;
-        uniform mat4 uWorld;
-        uniform vec3 u_viewWorldPosition;
-        
-        out vec3 v_normal;
-        out vec3 v_surfaceToView;
-        out vec4 v_color;
-        
-        void main() {
-            vec4 worldPosition = u_world * vec4(aPosition, 1.0);
-            gl_Position = u_projection * u_view * worldPosition;
-            v_surfaceToView = u_viewWorldPosition - worldPosition.xyz;
-            v_normal = mat3(u_world) * a_normal;
-            v_color = a_color;
-        }
-    `;
-
-    static textureFrag = `#version 300 es
-        precision highp float;
- 
-        in vec3 v_normal;
-        in vec3 v_surfaceToView;
-        in vec4 v_color;
-
-        uniform vec3 diffuse;
-        uniform vec3 ambient;
-        uniform vec3 emissive;
-        uniform vec3 specular;
-        uniform float shininess;
-        uniform float opacity;
-        uniform vec3 u_lightDirection;
-        uniform vec3 u_ambientLight;
-        
-        out vec4 outColor;
-        
-        void main () {
-            vec3 normal = normalize(v_normal);
-            
-            vec3 surfaceToViewDirection = normalize(v_surfaceToView);
-            vec3 halfVector = normalize(u_lightDirection + surfaceToViewDirection);
-            
-            float fakeLight = dot(u_lightDirection, normal) * .5 + .5;
-            float specularLight = clamp(dot(normal, halfVector), 0.0, 1.0);
-            
-            vec3 effectiveDiffuse = diffuse * v_color.rgb;
-            float effectiveOpacity = opacity * v_color.a;
-            
-            outColor = vec4(
-                emissive +
-                ambient * u_ambientLight +
-                effectiveDiffuse * fakeLight +
-                specular * pow(specularLight, shininess),
-                effectiveOpacity);
         }
     `;
 }
