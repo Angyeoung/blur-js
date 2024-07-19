@@ -1,5 +1,5 @@
 import { Matrix, Vector3 } from "./math.js";
-
+import { loadFile } from "./loaders.js";
 
 export class GameObject {
 
@@ -168,6 +168,8 @@ export class Transform {
 
 }
 
+// todo: use a Mesh and Material class, have a seperate class for loading in objs?
+
 export class Mesh {
 
     isBound = false;
@@ -185,11 +187,10 @@ export class Mesh {
 
     /** @param {string} path */
     static async fromFile(path) {
-        const text = await fetch(path).then(r => r.text());
-        console.log(`Mesh from '${path}' Loaded!\n\n`);
-        if (path.endsWith('.obj'))
-            return MeshLoader.obj(text);
-        return console.error("Error @ Mesh.fromFile(): Unsupported file type");
+        if (!path.endsWith('.obj'))
+            return console.error("Error @ Mesh.fromFile(): Unsupported file type");
+        const text = await loadFile(path);
+        return Parser.obj(text);
     }
 
     static createSharedMesh(meshes) {
@@ -236,7 +237,7 @@ export class Mesh {
     }
 }
 
-class MeshLoader {
+class Parser {
 
     /** @param {string} text */
     static obj(text) {
@@ -311,4 +312,62 @@ class MeshLoader {
         return new Mesh(verts, tris, norms, uvs);
     }
 
+    /** @param {string} text */
+    static mtl(text) {
+        const lines = text.split('\n');
+        const materials = [];
+        /** @type {Material} */
+        let currentMaterial = null;
+        const keywords = {
+            newmtl(args) {
+                currentMaterial = new Material(args[0]);
+                materials.push(currentMaterial);
+            },
+            Ns(args)    { currentMaterial.shininess = Number(args[0]);  },
+            Ka(args)    { currentMaterial.ambient   = args.map(Number); },
+            Kd(args)    { currentMaterial.diffuse   = args.map(Number); },
+            Ks(args)    { currentMaterial.specular  = args.map(Number); },
+            Ke(args)    { currentMaterial.emmisive  = args.map(Number); },
+            Ni(args)    { currentMaterial.optical   = Number(args[0]);  },
+            d(args)     { currentMaterial.opacity   = Number(args[0]);  },
+            illum(args) { currentMaterial.illum     = Number(args[0]);  },
+            map_Kd(args) {},
+            map_Bump(args) {},
+            sharpness(args) {}
+        }
+        for (let line of lines) {
+            if (line == '' || line[0] === '#') continue;
+            const [k, ...args] = line.trim().split(/\s+/);
+            keywords[k](args);
+        }
+        return materials;
+    }
+
 }
+
+export class Material {
+
+    
+    shininess = 400 // Ns
+    ambient = [0, 0, 0] // Ka
+    diffuse = [1, 1, 1] // Kd
+    specular = [1, 1, 1] // Ks
+    opacity = 1 // d
+    emmisive = null // Ke
+    optical = null // Ni
+    illum = null // illum mode
+
+    constructor(name) {
+        this.name = name;
+    }
+
+    /** @param {string} path */
+    static async fromFile(path) {
+        if (!path.endsWith('.mtl'))
+            return console.error("Path to material is not an mtl file");
+        const text = await loadFile(path);
+        return Parser.mtl(text);
+    }
+
+}
+

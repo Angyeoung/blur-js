@@ -10,41 +10,22 @@ import { Scene } from "./scene.js";
  */
 export class Renderer {
 
-    vertShader;
-    fragShader;
-
     /** @param {HTMLCanvasElement} canvas */
     constructor(canvas) {
         this.canvas = canvas;
         this._gl = canvas.getContext('webgl2');
-        this._program = this._gl.createProgram();
-        this.vertShader = this._setShader(this._gl.VERTEX_SHADER, Shader.defaultVert);
-        this.fragShader = this._setShader(this._gl.FRAGMENT_SHADER, Shader.defaultFrag);
-        this._linkProgram();
-        this._gl.useProgram(this._program);
+        this._program = this._createProgram(Shader.defaultVert, Shader.defaultFrag);
+        this._setCanvasResolution();
+        window.addEventListener('resize', () => this._setCanvasResolution());
+
+        // settings
         this._gl.enable(this._gl.DEPTH_TEST);
         this._gl.enable(this._gl.CULL_FACE);
         this._gl.frontFace(this._gl.CW);
         this._gl.cullFace(this._gl.BACK);
         this.setClearColor(0.75, 0.85, 0.8, 1);
-        // TODO: Make this better?
-        this._uniformLocations = {
-            mWorld: this._gl.getUniformLocation(this._program, 'mWorld'),
-            mView: this._gl.getUniformLocation(this._program, 'mView'),
-            mProj: this._gl.getUniformLocation(this._program, 'mProj')
-        }
-        this._setCanvasResolution();
-        window.addEventListener('resize', () => this._setCanvasResolution());
-    }
 
-    setVertShader(source = DEFAULT_VERT_SRC) {
-        this._setShader(this._gl.VERTEX_SHADER, source);
-        this._linkProgram();
-    }
-
-    setFragShader(source = DEFAULT_FRAG_SRC) {
-        this._setShader(this._gl.FRAGMENT_SHADER, source);
-        this._linkProgram();
+        this._uniformLocations = this._getUniformLocations();
     }
 
     setClearColor(r, g, b, a) {
@@ -60,55 +41,47 @@ export class Renderer {
         this._gl.clear(this._gl.COLOR_BUFFER_BIT | this._gl.DEPTH_BUFFER_BIT);
         
         // Set uniforms for view and projection
-        this._gl.uniformMatrix4fv(this._uniformLocations.mView, false, camera.transform.getViewMatrix());
-        this._gl.uniformMatrix4fv(this._uniformLocations.mProj, false, camera.getProjectionMatrix());
+        this._gl.uniformMatrix4fv(this._uniformLocations.uView, false, camera.transform.getViewMatrix());
+        this._gl.uniformMatrix4fv(this._uniformLocations.uProj, false, camera.getProjectionMatrix());
 
-        // TODO: Scene implement and fix this garbage
         for (let gameObject of scene.children) {
             if (!gameObject.mesh) continue;
             if (!gameObject.mesh.isBound) this._setupVAO(gameObject.mesh);
 
-            this._gl.uniformMatrix4fv(this._uniformLocations.mWorld, false, gameObject.transform.getWorldMatrix());
+            this._gl.uniformMatrix4fv(this._uniformLocations.uWorld, false, gameObject.transform.getWorldMatrix());
             
             this._gl.bindVertexArray(gameObject.mesh.vao);
             this._gl.drawElements(this._gl.TRIANGLES, gameObject.mesh.triangles.length, this._gl.UNSIGNED_SHORT, 0);
         }
     }
 
-    /**
-     * Create a shader and attach it to the current program
-     * @param {GLenum} shaderType - `gl.FRAGMENT_SHADER` | `gl.VERTEX_SHADER` 
-     * @param {string} source
-     */
-    _setShader(shaderType, source) {
-        
-        // Create and compile the shader
-        const shader = this._gl.createShader(shaderType);
-        this._gl.shaderSource(shader, source);
-        this._gl.compileShader(shader);
-        
-        if (!this._gl.getShaderParameter(shader, this._gl.COMPILE_STATUS))
-            console.error('Shader compilation failed:\n\n', this._gl.getShaderInfoLog(shader));
-        
-        // Detach previous shader if needed
-        if (shaderType === this._gl.FRAGMENT_SHADER && this.fragShader)
-            this._gl.detachShader(this._program, this.fragShader);
-        else if (shaderType === this._gl.VERTEX_SHADER && this.vertShader)
-            this._gl.detachShader(this._program, this.vertShader);
-        
-        // Attach the new shader
-        this._gl.attachShader(this._program, shader);
+    _createProgram(vertSource, fragSource) {
+        const program = this._gl.createProgram();
 
-        return shader;
-    }
+        // Shaders
+        const vertShader = this._gl.createShader(this._gl.VERTEX_SHADER);
+        const fragShader = this._gl.createShader(this._gl.FRAGMENT_SHADER);
+        this._gl.shaderSource(vertShader, vertSource);
+        this._gl.shaderSource(fragShader, fragSource);
+        this._gl.compileShader(vertShader);
+        this._gl.compileShader(fragShader);
+        if (!this._gl.getShaderParameter(vertShader, this._gl.COMPILE_STATUS))
+            console.error('Vertex shader compilation failed:\n\n', this._gl.getShaderInfoLog(vertShader));
+        if (!this._gl.getShaderParameter(fragShader, this._gl.COMPILE_STATUS))
+            console.error('Fragment shader compilation failed:\n\n', this._gl.getShaderInfoLog(fragShader));
+        this._gl.attachShader(program, vertShader);
+        this._gl.attachShader(program, fragShader);
+        
+        // Linking
+        this._gl.linkProgram(program);
+        this._gl.validateProgram(program);
+        if (!this._gl.getProgramParameter(program, this._gl.LINK_STATUS))
+            console.error('Program linking failed:\n\n', this._gl.getProgramInfoLog(program));
+        if (!this._gl.getProgramParameter(program, this._gl.VALIDATE_STATUS))
+            console.error('Program validation failed:\n\n', this._gl.getProgramInfoLog(program));
 
-    _linkProgram() {
-        this._gl.linkProgram(this._program);
-        this._gl.validateProgram(this._program);
-        if (!this._gl.getProgramParameter(this._program, this._gl.LINK_STATUS))
-            console.error('Program linking failed:\n\n', this._gl.getProgramInfoLog(this._program));
-        if (!this._gl.getProgramParameter(this._program, this._gl.VALIDATE_STATUS))
-            console.error('Program validation failed:\n\n', this._gl.getProgramInfoLog(this._program));
+        this._gl.useProgram(program);
+        return program;
     }
 
     _setCanvasResolution(mult = 1) {
@@ -137,7 +110,7 @@ export class Renderer {
         //* Texcoord buffer object and attribute
         this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._gl.createBuffer());
         this._gl.bufferData(this._gl.ARRAY_BUFFER, mesh.uvs, this._gl.STATIC_DRAW);
-        this._createAttribute('aTexCoord', 2, this._gl.FLOAT, false, 3*4, 0);
+        this._createAttribute('aTexCoord', 2, this._gl.FLOAT, true, 2*4, 0);
 
         //* Element buffer object
         this._gl.bindBuffer(this._gl.ELEMENT_ARRAY_BUFFER, this._gl.createBuffer());
@@ -161,6 +134,19 @@ export class Renderer {
         this._gl.vertexAttribPointer(loc, size, type, normalized, stride, offset);
         this._gl.enableVertexAttribArray(loc);
     }
+
+    _getUniformLocations() {
+        const uniformLocations = {};
+
+        const numUniforms = this._gl.getProgramParameter(this._program, this._gl.ACTIVE_UNIFORMS);
+        for (let i = 0; i < numUniforms; i++) {
+            const uniformInfo = this._gl.getActiveUniform(this._program, i);
+            const uniformLocation = this._gl.getUniformLocation(this._program, uniformInfo.name);
+            uniformLocations[uniformInfo.name] = uniformLocation;
+        }
+
+        return uniformLocations;
+    }
 }
 
 export class Shader {
@@ -168,15 +154,15 @@ export class Shader {
         in vec3 aPosition;
         in vec3 aNormal;
 
-        uniform mat4 mWorld;
-        uniform mat4 mView;
-        uniform mat4 mProj;
+        uniform mat4 uWorld;
+        uniform mat4 uView;
+        uniform mat4 uProj;
 
         out vec4 vFragColor;
 
         void main() {
             vFragColor = vec4(aNormal, 1.0);
-            gl_Position = mProj * mView * mWorld * vec4(aPosition, 1.0);
+            gl_Position = uProj * uView * uWorld * vec4(aPosition, 1.0);
         }
     `;
     
@@ -193,28 +179,63 @@ export class Shader {
     
     static textureVert = `#version 300 es
         in vec3 aPosition;
+        in vec3 aNormal;
         in vec2 aTexCoord;
-        uniform mat4 mWorld;
-        uniform mat4 mView;
-        uniform mat4 mProj;
-
-        out vec2 vTexCoord;
-
+        
+        uniform mat4 uProj;
+        uniform mat4 uView;
+        uniform mat4 uWorld;
+        uniform vec3 u_viewWorldPosition;
+        
+        out vec3 v_normal;
+        out vec3 v_surfaceToView;
+        out vec4 v_color;
+        
         void main() {
-            vTexCoord = aTexCoord;
+            vec4 worldPosition = u_world * vec4(aPosition, 1.0);
+            gl_Position = u_projection * u_view * worldPosition;
+            v_surfaceToView = u_viewWorldPosition - worldPosition.xyz;
+            v_normal = mat3(u_world) * a_normal;
+            v_color = a_color;
         }
     `;
 
     static textureFrag = `#version 300 es
-        precision mediump float;
+        precision highp float;
+ 
+        in vec3 v_normal;
+        in vec3 v_surfaceToView;
+        in vec4 v_color;
+
+        uniform vec3 diffuse;
+        uniform vec3 ambient;
+        uniform vec3 emissive;
+        uniform vec3 specular;
+        uniform float shininess;
+        uniform float opacity;
+        uniform vec3 u_lightDirection;
+        uniform vec3 u_ambientLight;
         
-        in vec2 vTexCoord;
-        uniform sampler2D uTexture;
-
-        out vec4 fragColor;
-
-        void main() {
-            fragColor = texture(uTexture, vTexCoord);
+        out vec4 outColor;
+        
+        void main () {
+            vec3 normal = normalize(v_normal);
+            
+            vec3 surfaceToViewDirection = normalize(v_surfaceToView);
+            vec3 halfVector = normalize(u_lightDirection + surfaceToViewDirection);
+            
+            float fakeLight = dot(u_lightDirection, normal) * .5 + .5;
+            float specularLight = clamp(dot(normal, halfVector), 0.0, 1.0);
+            
+            vec3 effectiveDiffuse = diffuse * v_color.rgb;
+            float effectiveOpacity = opacity * v_color.a;
+            
+            outColor = vec4(
+                emissive +
+                ambient * u_ambientLight +
+                effectiveDiffuse * fakeLight +
+                specular * pow(specularLight, shininess),
+                effectiveOpacity);
         }
     `;
 }

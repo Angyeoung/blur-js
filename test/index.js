@@ -6,7 +6,8 @@ import {
     Renderer,
     Scene,
     Vector3,
-    Input
+    Input,
+    Material
 } from "../src/blur.js";
 
 
@@ -20,6 +21,8 @@ const clock = new Clock();
 const monkey = new GameObject("Monkey").setMesh(await Mesh.fromFile('../models/monkey.obj'));
 const maxwell = new GameObject("maxwell").setMesh(await Mesh.fromFile('../models/maxwell.obj'));
 const girl = new GameObject("girl").setMesh(await Mesh.fromFile('../models/girl/girl.obj'));
+
+const mtl = Material.fromFile('../models/girl/girl.mtl');
 
 scene.add(monkey, maxwell, girl);
 camera.transform.setPosition(new Vector3(0, 0, -5));
