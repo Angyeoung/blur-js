@@ -1,0 +1,49 @@
+
+.inspectorWindow {
+    position: absolute;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.7);
+    font-size: 15px;
+    font-family: monospace;
+    top: 10px;
+    left: 10px;
+    width: 240px;
+    box-sizing: border-box;
+}
+
+.inspectorHead {
+    background-color: rgba(0, 0, 0, 0.5);
+    user-select: none;
+    cursor: grab;
+    padding: 0.5em;
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.inspectorBody {
+
+}
+
+.inspectorButton {
+    background-color: #0000;
+    padding: 0px;
+    border: none;
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+}
+
+.inspectorElement {
+    
+}
+
+.inspectorElementHead {
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 0.3em;
+}
+
+.inspectorElementBody {
+
+}

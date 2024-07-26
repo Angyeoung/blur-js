@@ -18,8 +18,7 @@ export class Renderer {
     constructor(canvas) {
         this.canvas = canvas;
         this._gl = canvas.getContext('webgl2');
-        this._program = this._createProgram(Shader.defaultVert, Shader.defaultFrag);
-        this._settings();
+        this._program = this._createProgram(Shader.mtlVert, Shader.mtlFrag);
         this._setUniformInfo();
         this._setCanvasResolution();
         window.addEventListener('resize', () => this._setCanvasResolution());
@@ -39,7 +38,7 @@ export class Renderer {
         
         // Set uniforms for view and projection
         this._setUniforms({
-            uView: camera.transform.getViewMatrix(),
+            uView: camera.getViewMatrix(),
             uProj: camera.getProjectionMatrix()
         });
 
@@ -47,7 +46,7 @@ export class Renderer {
             if (!gameObject.mesh) continue;
             if (!gameObject.mesh.isBound) this._setupVAO(gameObject.mesh);
             
-            this._setUniforms({ uWorld: gameObject.transform.getWorldMatrix() });
+            this._setUniforms({ uWorld: gameObject.getWorldMatrix() });
             
             this._gl.bindVertexArray(gameObject.mesh.vao);
             this._gl.drawElements(this._gl.TRIANGLES, gameObject.mesh.triangles.length, this._gl.UNSIGNED_SHORT, 0);
@@ -79,6 +78,13 @@ export class Renderer {
         if (!this._gl.getProgramParameter(program, this._gl.VALIDATE_STATUS))
             console.error('Program validation failed:\n\n', this._gl.getProgramInfoLog(program));
 
+        // Settings
+        this._gl.enable(this._gl.DEPTH_TEST);
+        this._gl.enable(this._gl.CULL_FACE);
+        this._gl.frontFace(this._gl.CW);
+        this._gl.cullFace(this._gl.BACK);
+        this.setClearColor(0.75, 0.85, 0.8, 1);
+
         this._gl.useProgram(program);
         return program;
     }
@@ -86,15 +92,7 @@ export class Renderer {
     _setCanvasResolution(mult = 1) {
         this.canvas.width = window.innerWidth * mult;
         this.canvas.height = window.innerHeight * mult;
-        this._gl.viewport(0, 0, window.innerWidth * mult, window.innerHeight * mult);  
-    }
-    
-    _settings() {
-        this._gl.enable(this._gl.DEPTH_TEST);
-        this._gl.enable(this._gl.CULL_FACE);
-        this._gl.frontFace(this._gl.CW);
-        this._gl.cullFace(this._gl.BACK);
-        this.setClearColor(0.75, 0.85, 0.8, 1);
+        this._gl.viewport(0, 0, this._gl.canvas.width, this._gl.canvas.height);  
     }
 
     /**
@@ -115,9 +113,11 @@ export class Renderer {
         this._createAttribute('aNormal', 3, this._gl.FLOAT, false, 3*4, 0);
         
         //* Texcoord buffer object and attribute
-        this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._gl.createBuffer());
-        this._gl.bufferData(this._gl.ARRAY_BUFFER, mesh.uvs, this._gl.STATIC_DRAW);
-        this._createAttribute('aTexCoord', 2, this._gl.FLOAT, true, 2*4, 0);
+        if (mesh.uvs.length) {
+            this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._gl.createBuffer());
+            this._gl.bufferData(this._gl.ARRAY_BUFFER, mesh.uvs, this._gl.STATIC_DRAW);
+            this._createAttribute('aTexCoord', 2, this._gl.FLOAT, true, 2*4, 0);
+        }
 
         //* Element buffer object
         this._gl.bindBuffer(this._gl.ELEMENT_ARRAY_BUFFER, this._gl.createBuffer());
@@ -158,8 +158,10 @@ export class Renderer {
     _setUniforms(obj) {
         for (let name in obj) {
             const info = this._uniforms[name];
-            if (info.type === uTypes.mat4) {
+            if (info && info.type === uTypes.mat4) {
                 this._gl.uniformMatrix4fv(info.location, false, obj[name]);
+            } else {
+                console.error("Passed in uniform is undefined or has an invalid type!");
             }
         }
     }
@@ -174,10 +176,10 @@ export class Shader {
         uniform mat4 uView;
         uniform mat4 uProj;
 
-        out vec4 vFragColor;
+        out vec3 vNormal;
 
         void main() {
-            vFragColor = vec4(aNormal, 1.0);
+            vNormal = aNormal;
             gl_Position = uProj * uView * uWorld * vec4(aPosition, 1.0);
         }
     `;
@@ -185,11 +187,71 @@ export class Shader {
     static defaultFrag = `#version 300 es
         precision mediump float;
 
-        in vec4 vFragColor;
+        in vec3 vNormal;
         out vec4 fragColor;
 
         void main() {
-            fragColor = vFragColor;
+            fragColor = vec4(vNormal, 1.0);
+        }
+    `;
+
+    static litDirectionalVert = `#version 300 es
+        in vec3 aPosition;
+        in vec3 aNormal;
+
+        uniform mat4 uWorld;
+        uniform mat4 uView;
+        uniform mat4 uProj;
+
+        out vec3 vNormal;
+
+        void main() {
+            vNormal = aNormal;
+            gl_Position = uProj * uView * uWorld * vec4(aPosition, 1.0);
+        }
+    `;
+    
+    static litDirectionalFrag = `#version 300 es
+        precision mediump float;
+
+        in vec3 vNormal;
+        out vec4 fragColor;
+
+        void main() {
+            vec3 normal = normalize(vNormal);
+            float light = dot(normal, vec3(0.5, 0.7, 1.0));
+            fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            fragColor.rgb *= light;
+        }
+    `;
+
+    static mtlVert = `#version 300 es
+        in vec3 aPosition;
+        in vec3 aNormal;
+
+        uniform mat4 uWorld;
+        uniform mat4 uView;
+        uniform mat4 uProj;
+
+        out vec3 vNormal;
+
+        void main() {
+            vNormal = aNormal;
+            gl_Position = uProj * uView * uWorld * vec4(aPosition, 1.0);
+        }
+    `;
+    
+    static mtlFrag = `#version 300 es
+        precision mediump float;
+
+        in vec3 vNormal;
+        out vec4 fragColor;
+
+        void main() {
+            vec3 normal = normalize(vNormal);
+            float light = dot(normal, vec3(0.5, 0.7, 1.0));
+            fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            fragColor.rgb *= light;
         }
     `;
 }

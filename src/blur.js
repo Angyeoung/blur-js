@@ -4,7 +4,8 @@ import { Vector3, Matrix } from "./math.js";
 import { Scene } from "./scene.js";
 import { Clock } from "./clock.js";
 import { Input } from "./input.js";
-import { GameObject, Mesh, Transform, Material } from "./gameObject.js";
+import { InspectorWindow } from "./inspector.js";
+import { GameObject, Mesh, Material } from "./gameObject.js";
 
 export {
     Renderer,
@@ -14,8 +15,8 @@ export {
     Scene,
     GameObject,
     Mesh,
-    Transform,
     Clock,
     Input,
-    Material
+    Material,
+    InspectorWindow
 }

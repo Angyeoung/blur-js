@@ -49,7 +49,7 @@ async function loadTexture() {
  * @param {string} url 
  * @returns {Promise<HTMLImageElement>}
  */
-export function loadImage(path) {
+export async function loadImage(path) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.src = path;

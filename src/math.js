@@ -258,7 +258,12 @@ export class Matrix {
     }
 
 
-    /** Sets a matrix to a scale matrix */
+    /**
+     * Sets `m` to a scale matrix
+     * @param {Float32Array} m 
+     * @param {Vector3} vector 
+     * @returns {Float32Array}
+     */
     static setScaled(m, vector) {
         m[0] = vector.x;
         m[5] = vector.y;

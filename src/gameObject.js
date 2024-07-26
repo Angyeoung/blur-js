@@ -3,10 +3,15 @@ import { loadFile } from "./loaders.js";
 
 export class GameObject {
 
+    #worldNeedsUpdate = true;
+    #viewNeedsUpdate = true;
+    #worldMatrix = Matrix.identity;
+    #viewMatrix = Matrix.identity;
+
     /** @type {Mesh} */
     mesh = null;
-    transform = new Transform();
 
+    /** @type {GameObject} */
     parent = null;
     /** @type {GameObject[]} */
     children = [];
@@ -14,12 +19,14 @@ export class GameObject {
     /** @param {string} name */
     constructor(name) {
         this.name = name;
+        this.position = Vector3.zero;
+        this.rotation = Vector3.zero;
+        this.scale = Vector3.one;
     }
 
-    get position() { return this.transform.position; }
-    get rotation() { return this.transform.rotation; }
-    get scale()    { return this.transform.scale;    }
-    get forward()  { return this.transform.forward;  }
+    get forward() {
+        return Vector3.transform(Vector3.forward, Matrix.rotate(Matrix.identity, this.rotation))
+    }
 
     /** @param {Mesh} mesh */
     setMesh(mesh) {
@@ -27,47 +34,14 @@ export class GameObject {
         return this;
     }
 
-    /**
-     * @param {...GameObject} children 
-     */
+    /** @param {...GameObject} children */
     add(...children) {
         for (let child of children) {
             if (!(child instanceof GameObject)) continue;
             this.children.push(child);
         }
+        return this;
     }
-
-}
-
-export class Transform {
-
-    #worldNeedsUpdate = true;
-    #viewNeedsUpdate = true;
-    #worldMatrix = Matrix.identity;
-    #viewMatrix = Matrix.identity;
-
-    /* ========================================================== */
-
-    /** 
-     * @param {Vector3} position
-     * @param {Vector3} rotation
-     * @param {Vector3} scale
-     */
-    constructor(position = Vector3.zero, rotation = Vector3.zero, scale = Vector3.one) {
-        this.position = position;
-        this.rotation = rotation;
-        this.scale    = scale;
-        this.getWorldMatrix();
-        this.getViewMatrix();
-    }
-
-    /* ========================================================== */
-
-    get forward() {
-        return Vector3.transform(Vector3.forward, Matrix.rotate(Matrix.identity, this.rotation))
-    }   
-
-
 
     getWorldMatrix() {
         if (this.#worldNeedsUpdate) {
@@ -79,8 +53,6 @@ export class Transform {
         return this.#worldMatrix;
     }
 
-
-
     getViewMatrix() {
         if (this.#viewNeedsUpdate) {
             Matrix.lookAt(this.#viewMatrix, this.position, this.position.sum(this.forward));
@@ -89,11 +61,10 @@ export class Transform {
         return this.#viewMatrix;
     }
 
-
-
     /** @param {Vector3} vector */
     translate(vector) {
-        if (Vector3.isNaN(vector)) return;
+        if (Vector3.isNaN(vector)) 
+            return this;
         this.position.x += vector.x;
         this.position.y += vector.y;
         this.position.z += vector.z;
@@ -102,11 +73,10 @@ export class Transform {
         return this;
     }
 
-
-
     /** @param {Vector3} vector */
     translateLocal(vector) {
-        if (Vector3.isNaN(vector)) return;
+        if (Vector3.isNaN(vector)) 
+            return this;
         const local = Vector3.transform(vector, Matrix.rotate(Matrix.identity, this.rotation));
         this.translate(local);
         this.#worldNeedsUpdate = true;
@@ -114,11 +84,10 @@ export class Transform {
         return this;
     }
 
-
-
     /** @param {Vector3} vector */
     rotate(vector) {
-        if (Vector3.isNaN(vector)) return;
+        if (Vector3.isNaN(vector)) 
+            return this;
         this.rotation.x = (this.rotation.x + vector.x) % 360;
         this.rotation.y = (this.rotation.y + vector.y) % 360;
         this.rotation.z = (this.rotation.z + vector.z) % 360;
@@ -127,11 +96,10 @@ export class Transform {
         return this;
     }
 
-
-
     /** @param {Vector3} vector */
     setPosition(vector) {
-        if (Vector3.isNaN(vector)) return;
+        if (Vector3.isNaN(vector)) 
+            return this;
         this.position.x = vector.x;
         this.position.y = vector.y;
         this.position.z = vector.z;
@@ -140,11 +108,10 @@ export class Transform {
         return this;
     }
 
-
-
     /** @param {Vector3} vector */
     setRotation(vector) {
-        if (Vector3.isNaN(vector)) return;
+        if (Vector3.isNaN(vector)) 
+            return this;
         this.rotation.x = vector.x % 360;
         this.rotation.y = vector.y % 360;
         this.rotation.z = vector.z % 360;
@@ -153,11 +120,10 @@ export class Transform {
         return this;
     }
 
-
-
     /** @param {Vector3} vector */
     setScale(vector) {
-        if (Vector3.isNaN(vector)) return;
+        if (Vector3.isNaN(vector)) 
+            return this;
         this.scale.x = vector.x;
         this.scale.y = vector.y;
         this.scale.z = vector.z;
@@ -261,16 +227,12 @@ class Parser {
             else if (type === 'f ') {
                 const split = line.slice(2).trim().split(/\s+/).map(arr => arr.split('/'));
                 const vert = split.map(i => parseInt(i[0]) - 1);
-                // const norm = split.map(i => parseInt(i[1]) - 1);
                 const text = split.map(i => parseInt(i[2]) - 1);
-                if (split.length === 3) {
-                    tris.push(vert[0], vert[1], vert[2]);
-                    uvs.push(uvCoords[text[0]], uvCoords[text[1]], uvCoords[text[2]]);
-                } else {
-                    for (let i = 0; i < split.length - 2; i++) {
-                        tris.push(vert[0], vert[i+1], vert[i+2]);
+                // const norm = split.map(i => parseInt(i[1]) - 1);
+                for (let i = 0; i < split.length - 2; i++) {
+                    tris.push(vert[0], vert[i+1], vert[i+2]);
+                    if (uvCoords.length) 
                         uvs.push(uvCoords[text[0]], uvCoords[text[i+1]], uvCoords[text[i+2]]);
-                    }
                 }
             }
         }
