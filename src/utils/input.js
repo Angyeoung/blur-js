@@ -47,17 +47,3 @@ export class Input {
         document.addEventListener('wheel', handleWheelInput);
     }
 }
-
-// TODO: Find a way to make something like this work
-export class Controller {
-
-    /**
-     * @param {Input} input 
-     */
-    constructor(transform, input) {
-        this.input = input;
-    }
-
-
-
-}

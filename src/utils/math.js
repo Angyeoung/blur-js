@@ -216,6 +216,12 @@ export class Vector3 {
         return this;
     }
 
+
+
+    f32() {
+        return new Float32Array([this.x, this.y, this.z]);
+    }
+
 }
 
 export class Matrix {

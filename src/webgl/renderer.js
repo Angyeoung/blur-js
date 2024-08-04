@@ -1,9 +1,12 @@
-import { Mesh } from "./gameObject.js";
+import { Mesh } from "../game/gameObject.js";
 import { Camera } from "./camera.js";
 import { Scene } from "./scene.js";
+import { Vector3 } from "../utils/math.js";
 
 const uTypes = {
     mat4: 35676,
+    vec3: 35665,
+    vec4: 35666
 }
 
 /**
@@ -12,12 +15,10 @@ const uTypes = {
  */
 export class Renderer {
 
-    a = 2;
-
     /** @param {HTMLCanvasElement} canvas */
     constructor(canvas) {
-        this.canvas = canvas;
-        this._gl = canvas.getContext('webgl2');
+        this.canvas = canvas || document.querySelector('canvas');
+        this._gl = this.canvas.getContext('webgl2');
         this._program = this._createProgram(Shader.mtlVert, Shader.mtlFrag);
         this._setUniformInfo();
         this._setCanvasResolution();
@@ -39,7 +40,8 @@ export class Renderer {
         // Set uniforms for view and projection
         this._setUniforms({
             uView: camera.getViewMatrix(),
-            uProj: camera.getProjectionMatrix()
+            uProj: camera.getProjectionMatrix(),
+            uLightDirection: new Vector3(0, 10, 0).normalized().f32()
         });
 
         for (let gameObject of scene.children) {
@@ -47,9 +49,14 @@ export class Renderer {
             if (!gameObject.mesh.isBound) this._setupVAO(gameObject.mesh);
             
             this._setUniforms({ uWorld: gameObject.getWorldMatrix() });
+
+            for (let geometry of gameObject.mesh.geometries) {
+                this._setUniforms({ uDiffuse: [...geometry.material.diffuse, 1] });
+                this._gl.bindVertexArray(geometry.vao);
+                this._gl.drawElements(this._gl.TRIANGLES, geometry.triangles.length, this._gl.UNSIGNED_SHORT, 0);
+            }
+
             
-            this._gl.bindVertexArray(gameObject.mesh.vao);
-            this._gl.drawElements(this._gl.TRIANGLES, gameObject.mesh.triangles.length, this._gl.UNSIGNED_SHORT, 0);
         }
     }
 
@@ -99,14 +106,16 @@ export class Renderer {
      * @param {Mesh} mesh 
      */
     _setupVAO(mesh) {
+        if (mesh.isBound) return;
+        
         mesh.vao = this._gl.createVertexArray();
         this._gl.bindVertexArray(mesh.vao);
-
+        
         //* Vertex buffer object and attribute
         this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._gl.createBuffer());
         this._gl.bufferData(this._gl.ARRAY_BUFFER, mesh.vertices, this._gl.STATIC_DRAW);
         this._createAttribute('aPosition', 3, this._gl.FLOAT, false, 3*4, 0);
-
+        
         //* Normal buffer object and attribute
         this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._gl.createBuffer());
         this._gl.bufferData(this._gl.ARRAY_BUFFER, mesh.normals, this._gl.STATIC_DRAW);
@@ -118,10 +127,11 @@ export class Renderer {
             this._gl.bufferData(this._gl.ARRAY_BUFFER, mesh.uvs, this._gl.STATIC_DRAW);
             this._createAttribute('aTexCoord', 2, this._gl.FLOAT, true, 2*4, 0);
         }
-
+        
         //* Element buffer object
         this._gl.bindBuffer(this._gl.ELEMENT_ARRAY_BUFFER, this._gl.createBuffer());
         this._gl.bufferData(this._gl.ELEMENT_ARRAY_BUFFER, mesh.triangles, this._gl.STATIC_DRAW);
+            
 
         this._gl.bindVertexArray(null);
         mesh.isBound = true;
@@ -158,10 +168,15 @@ export class Renderer {
     _setUniforms(obj) {
         for (let name in obj) {
             const info = this._uniforms[name];
-            if (info && info.type === uTypes.mat4) {
+            if (!info) console.error("Issue @ _setUniforms()");
+            if (info.type === uTypes.mat4) {
                 this._gl.uniformMatrix4fv(info.location, false, obj[name]);
+            } else if (info.type === uTypes.vec3) {
+                this._gl.uniform3fv(info.location, obj[name]);
+            } else if (info.type === uTypes.vec4) {
+                this._gl.uniform4fv(info.location, obj[name]);
             } else {
-                console.error("Passed in uniform is undefined or has an invalid type!");
+                console.error("Unsupported uniform type @ _setUniforms()");
             }
         }
     }
@@ -228,16 +243,19 @@ export class Shader {
     static mtlVert = `#version 300 es
         in vec3 aPosition;
         in vec3 aNormal;
+        in vec2 aTexCoord;
 
         uniform mat4 uWorld;
         uniform mat4 uView;
         uniform mat4 uProj;
 
         out vec3 vNormal;
+        out vec2 vTexCoord;
 
         void main() {
-            vNormal = aNormal;
             gl_Position = uProj * uView * uWorld * vec4(aPosition, 1.0);
+            vTexCoord = aTexCoord;
+            vNormal = mat3(uWorld) * aNormal;
         }
     `;
     
@@ -245,13 +263,17 @@ export class Shader {
         precision mediump float;
 
         in vec3 vNormal;
+
+        uniform vec4 uDiffuse;
+        uniform vec3 uLightDirection;
+
         out vec4 fragColor;
 
         void main() {
             vec3 normal = normalize(vNormal);
-            float light = dot(normal, vec3(0.5, 0.7, 1.0));
-            fragColor = vec4(1.0, 0.0, 0.0, 1.0);
-            fragColor.rgb *= light;
+            float fakeLight = dot(uLightDirection, normal) * .5 + .5;
+            vec4 diffuse = uDiffuse * vec4(1.0, 0.5, 0.5, 1.0);
+            fragColor = vec4(diffuse.rgb * fakeLight, diffuse.a);
         }
     `;
 }

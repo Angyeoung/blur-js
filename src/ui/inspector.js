@@ -15,10 +15,11 @@ export class InspectorWindow {
         this.head = document.createElement('div');
         this.body = document.createElement('div');
         this.el.append(this.head, this.body);
+        this.currentGroup = this;
         
         this.el.className = "inspectorWindow";
-        this.head.className = "inspectorHead";
-        this.body.className = "inspectorBody";
+        this.head.className = "inspectorWindowHead";
+        this.body.className = "inspectorWindowBody";
 
         const title = document.createElement('span');
         title.innerText = name;
@@ -51,14 +52,12 @@ export class InspectorWindow {
     }
 
     onMouseDown(e) {
-        this.head.style.cursor = 'grabbing';
         this.dragStartX = e.clientX - this.el.offsetLeft;
         this.dragStartY = e.clientY - this.el.offsetTop;
         this.isDragged = true;
     }
 
     onMouseUp() {
-        this.head.style.cursor = 'grab';
         this.isDragged = false;
     }
 
@@ -68,60 +67,102 @@ export class InspectorWindow {
         this.el.style.top = e.clientY - this.dragStartY + 'px';
     }
 
-    slider(header, value, min, max) {
-        this.body.append(new Slider(header, value, min, max).el);
+    add(InspectorElement) {
+        this.body.append(InspectorElement.el);
+    }
+
+    startGroup(header) {
+        const group = new InspectorGroup(header);
+        this.currentGroup = group;
+        this.add(group);
+    }
+
+    endGroup() {
+        this.currentGroup = this;
+    }
+
+    slider(header, min, max, getter, setter) {
+        this.currentGroup.add(new Slider(header, min, max, getter, setter).el);
     }
 }
 
 class InspectorElement {
 
+    constructor() {
+        this.el = document.createElement('div');
+        this.el.className = 'inspectorElement';
+    }
+
+}
+
+class InspectorGroup extends InspectorElement {
+
     isHidden = false;
 
-    constructor(header) {
-        this.el = document.createElement('div');
+    constructor(text) {
+        super();
         this.head = document.createElement('div');
         this.body = document.createElement('div');
+        this.head.innerText = text;
+        this.el.className = 'inspectorElementGroup';
+        this.head.className = 'inspectorElementGroupHead';
+        this.body.className = 'inspectorElementGroupBody';
+
+        this.head.onclick = () => {
+            this.isHidden = !this.isHidden;
+            this.body.style.display = this.isHidden ? 'none' : 'block';
+        }
+
         this.el.append(this.head, this.body);
+    }
 
-        this.el.className = 'inspectorElement';
-        this.head.className = 'inspectorElementHead';
-        this.body.className = 'inspectorElementBody';
+    add(...elements) {
+        this.body.append(...elements);
+    }
 
-        this.head.innerText = header;
-        
-        this.head.onclick = () => this.toggleVisibility();
+    setHeader(text) {
+        this.head.innerText = text;
+    }
+
+    getHeader() {
+        return this.head.innerText;
     }
 
     toggleVisibility() {
-        this.isHidden = !this.isHidden;
-        this.body.style.display = this.isHidden ? 'none' : 'block';
+
     }
 
 }
 
 class Slider extends InspectorElement {
-    constructor(header, value, min, max) {
-        super(header);
-        this.value = value;
-        this.min = min;
-        this.max = max;
+    constructor(label, min, max, getter, setter) {
+        super();
+        this.getter = getter;
+        this.setter = setter;
         
         this.slider = document.createElement('input');
         this.slider.type = 'range';
-        this.slider.value = value;
+        this.slider.value = getter();
         this.slider.min = min;
         this.slider.max = max;
+        this.slider.step = 0.01;
         this.slider.style.flex = '1';
+        this.slider.addEventListener('input', () => {
+            this.setter(this.slider.value);
+        });
 
+        this.label = document.createElement('span');
         this.minEl = document.createElement('span');
         this.maxEl = document.createElement('span');
-        this.minEl.innerText = this.min;
-        this.maxEl.innerText = this.max;
+        this.label.innerText = label + ": ";
+        this.minEl.innerText = min;
+        this.maxEl.innerText = max;
 
         const container = document.createElement('div');
         container.style.display = 'flex';
-        container.append(this.min, this.slider, this.max);
+        container.style.gap = '5px';
+        container.append(this.label, this.minEl, this.slider, this.maxEl);
 
-        this.body.append(container);
+        this.el.append(container);
     }
 }

@@ -1,5 +1,5 @@
 import { GameObject } from "./gameObject.js";
-import { Matrix } from "./math.js";
+import { Matrix } from "./utils/math.js";
 
 export class Camera extends GameObject {
 

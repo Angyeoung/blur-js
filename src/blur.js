@@ -1,11 +1,11 @@
-import { Renderer } from "./renderer.js";
+import { Renderer } from "./webgl/renderer.js";
 import { Camera } from "./camera.js";
-import { Vector3, Matrix } from "./math.js";
+import { Vector3, Matrix } from "./utils/math.js";
 import { Scene } from "./scene.js";
-import { Clock } from "./clock.js";
-import { Input } from "./input.js";
-import { InspectorWindow } from "./inspector.js";
-import { GameObject, Mesh, Material } from "./gameObject.js";
+import { Clock } from "./utils/clock.js";
+import { Input } from "./utils/input.js";
+import { InspectorWindow } from "./ui/inspector.js";
+import { GameObject, Mesh, Material } from "./game/gameObject.js";
 
 export {
     Renderer,
